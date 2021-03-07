@@ -32,6 +32,7 @@
 #include "SDL_syswm.h"
 #include "../SDL_sysrender.h"
 #include "../SDL_d3dmath.h"
+#include "../../SDL_hints_c.h"
 #include "../../video/windows/SDL_windowsvideo.h"
 
 #if SDL_VIDEO_RENDER_D3D
@@ -1554,12 +1555,29 @@ D3D_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 }
 
 static void
+D3D_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    D3D_RenderData *data = renderer->driverdata;
+    if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+        data->pparams.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+        renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+    } else {
+        data->pparams.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+        renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+    }
+    D3D_Reset(renderer);
+}
+
+static void
 D3D_DestroyRenderer(SDL_Renderer * renderer)
 {
     D3D_RenderData *data = (D3D_RenderData *) renderer->driverdata;
 
     if (data) {
         int i;
+
+        SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, D3D_UpdateVSync, renderer);
 
         /* Release the render target */
         if (data->defaultRenderTarget) {
@@ -1763,6 +1781,8 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
     } else {
         pparams.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
     }
+
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, D3D_UpdateVSync, renderer);
 
     /* Get the adapter for the display that the window is on */
     displayIndex = SDL_GetWindowDisplayIndex(window);

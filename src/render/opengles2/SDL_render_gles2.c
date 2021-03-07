@@ -26,6 +26,7 @@
 #include "SDL_opengles2.h"
 #include "../SDL_sysrender.h"
 #include "../../video/SDL_blit.h"
+#include "../../SDL_hints_c.h"
 #include "SDL_shaders_gles2.h"
 
 /* To prevent unnecessary window recreation,
@@ -1276,6 +1277,22 @@ GLES2_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *ver
 }
 
 static void
+GLES2_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+        SDL_GL_SetSwapInterval(1);
+    } else {
+        SDL_GL_SetSwapInterval(0);
+    }
+    if (SDL_GL_GetSwapInterval() > 0) {
+        renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+    } else {
+        renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+    }
+}
+
+static void
 GLES2_DestroyRenderer(SDL_Renderer *renderer)
 {
     GLES2_RenderData *data = (GLES2_RenderData *)renderer->driverdata;
@@ -1283,6 +1300,8 @@ GLES2_DestroyRenderer(SDL_Renderer *renderer)
     /* Deallocate everything */
     if (data) {
         GLES2_ActivateRenderer(renderer);
+
+        SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, GLES2_UpdateVSync, renderer);
 
         {
             int i;
@@ -2017,6 +2036,8 @@ GLES2_CreateRenderer(SDL_Window *window, Uint32 flags)
     if (SDL_GL_GetSwapInterval() > 0) {
         renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
     }
+
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, GLES2_UpdateVSync, renderer);
 
     /* Check for debug output support */
     if (SDL_GL_GetAttribute(SDL_GL_CONTEXT_FLAGS, &value) == 0 &&

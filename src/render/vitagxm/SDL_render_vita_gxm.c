@@ -24,6 +24,7 @@
 
 #include "SDL_hints.h"
 #include "../SDL_sysrender.h"
+#include "../../SDL_hints_c.h"
 #include "SDL_log.h"
 
 #include <stdio.h>
@@ -196,6 +197,20 @@ StartDrawing(SDL_Renderer *renderer)
     data->drawing = SDL_TRUE;
 }
 
+static void
+VITA_GXM_UpdateVSync(void *userdata, const char *name, const char *oldValue, const char *newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    VITA_GXM_RenderData *data = renderer->driverdata;
+    if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+        data->displayData.wait_vblank = SDL_TRUE;
+        renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+    } else {
+        data->displayData.wait_vblank = SDL_FALSE;
+        renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+    }
+}
+
 SDL_Renderer *
 VITA_GXM_CreateRenderer(SDL_Window *window, Uint32 flags)
 {
@@ -251,6 +266,8 @@ VITA_GXM_CreateRenderer(SDL_Window *window, Uint32 flags)
     } else {
         data->displayData.wait_vblank = SDL_FALSE;
     }
+
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, VITA_GXM_UpdateVSync, renderer);
 
     if (gxm_init(renderer) != 0)
     {
@@ -1170,6 +1187,8 @@ VITA_GXM_DestroyRenderer(SDL_Renderer *renderer)
     if (data) {
         if (!data->initialized)
             return;
+
+        SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, VITA_GXM_UpdateVSync, renderer);
 
         gxm_finish(renderer);
 
