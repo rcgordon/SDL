@@ -874,3 +874,4 @@ SDL_DYNAPI_PROC(int,SDL_isgraph,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_AndroidShowToast,(const char *a, int b, int c, int d, int e),(a,b,c,d,e),return)
 #endif
 SDL_DYNAPI_PROC(int,SDL_GetAudioDeviceSpec,(int a, int b, SDL_AudioSpec *c),(a,b,c),return)
+SDL_DYNAPI_PROC(int,SDL_RenderGeometry,(SDL_Renderer *a, SDL_Texture *b, SDL_Vertex *c, int d, int *e, int f),(a,b,c,d,e,f),return)
