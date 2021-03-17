@@ -144,8 +144,7 @@ typedef struct SDL_Vertex
 {
     SDL_FPoint position;        /**< Vertex position, in SDL_Renderer coordinates  */
     SDL_Color  color;           /**< Vertex color */
-    SDL_FPoint tex_coord;       /**< Texture coordinates (0..texture width, 0..texture height),
-				     if needed */
+    SDL_FPoint tex_coord;       /**< Normalized texture coordinates, if needed */
 } SDL_Vertex;
 
 
@@ -1088,7 +1087,6 @@ extern DECLSPEC int SDLCALL SDL_RenderGeometry(SDL_Renderer *renderer,
                                                SDL_Texture *texture,
                                                SDL_Vertex *vertices, int num_vertices,
                                                int *indices, int num_indices);
-
 
 /**
  *  \brief Read pixels from the current rendering target.
