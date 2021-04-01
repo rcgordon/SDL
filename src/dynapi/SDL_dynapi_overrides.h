@@ -809,5 +809,6 @@
 #define SDL_isgraph SDL_isgraph_REAL
 #define SDL_AndroidShowToast SDL_AndroidShowToast_REAL
 #define SDL_GetAudioDeviceSpec SDL_GetAudioDeviceSpec_REAL
+#define SDL_TLSCleanup SDL_TLSCleanup_REAL
 #define SDL_RenderGeometryRaw SDL_RenderGeometryRaw_REAL
 #define SDL_RenderGeometry SDL_RenderGeometry_REAL
