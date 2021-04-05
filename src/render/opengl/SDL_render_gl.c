@@ -537,7 +537,7 @@ GL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
             break;
         case SDL_ScaleModeLinear:
             magnificationScaleMode = GL_LINEAR;
-            minificationScaleMode = data->mipmap ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR;
+            minificationScaleMode = data->mipmap ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
             break;
         case SDL_ScaleModeBest:
             magnificationScaleMode = GL_LINEAR;
@@ -836,7 +836,7 @@ GL_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Scale
             break;
         case SDL_ScaleModeLinear:
             magnificationScaleMode = GL_LINEAR;
-            minificationScaleMode = data->mipmap ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR;
+            minificationScaleMode = data->mipmap ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
             break;
         case SDL_ScaleModeBest:
             magnificationScaleMode = GL_LINEAR;
