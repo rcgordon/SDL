@@ -136,9 +136,15 @@ SetFullscreen(SDL_Window *window, struct wl_output *output)
             return; /* Can't do anything yet, wait for ShowWindow */
         }
         if (output) {
+            if (!(window->flags & SDL_WINDOW_RESIZABLE)) {
+                libdecor_frame_set_capabilities(wind->shell_surface.libdecor.frame, LIBDECOR_ACTION_RESIZE);
+            }
             libdecor_frame_set_fullscreen(wind->shell_surface.libdecor.frame, output);
         } else {
             libdecor_frame_unset_fullscreen(wind->shell_surface.libdecor.frame);
+            if (!(window->flags & SDL_WINDOW_RESIZABLE)) {
+                libdecor_frame_unset_capabilities(wind->shell_surface.libdecor.frame, LIBDECOR_ACTION_RESIZE);
+            }
         }
     } else
 #endif
