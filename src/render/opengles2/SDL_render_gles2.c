@@ -1334,6 +1334,7 @@ GLES2_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture)
     GLenum type;
     GLenum magnificationScaleMode;
     GLenum minificationScaleMode;
+    GLboolean generateMipmaps = GL_FALSE;
 
     GLES2_ActivateRenderer(renderer);
 
@@ -1402,7 +1403,8 @@ GLES2_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture)
                 break;
             case SDL_ScaleModeBest:
                 magnificationScaleMode = GL_LINEAR;
-                minificationScaleMode =  (data->texture_type == GL_TEXTURE_2D) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+                minificationScaleMode = (data->texture_type == GL_TEXTURE_2D) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+                generateMipmaps = (data->texture_type == GL_TEXTURE_2D) ? GL_TRUE : GL_FALSE;
                 break;
             default:
                 magnificationScaleMode = GL_NEAREST;
@@ -1500,8 +1502,8 @@ GLES2_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture)
         }
 
         /* Generate mipmaps for minification if scaling using mipmaps is enabled */
-        if(texture->scaleMode == SDL_ScaleModeBest) {
-            renderdata->glGenerateMipmap(GL_TEXTURE_2D);
+        if(generateMipmaps == GL_TRUE) {
+            renderdata->glGenerateMipmap(data->texture_type);
         }
     }
 
@@ -1579,7 +1581,7 @@ GLES2_UpdateTexture(SDL_Renderer *renderer, SDL_Texture *texture, const SDL_Rect
                     pixels, pitch, SDL_BYTESPERPIXEL(texture->format));
 
     /* Re-generate mipmaps for minification if scaling using mipmaps is enabled */
-    if(texture->scaleMode == SDL_ScaleModeBest && tdata->texture_type == GL_TEXTURE_2D) {
+    if(texture->scaleMode == SDL_ScaleModeMipmap && tdata->texture_type == GL_TEXTURE_2D) {
         data->glGenerateMipmap(tdata->texture_type);
     }
 
@@ -1766,6 +1768,7 @@ GLES2_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Sc
     GLES2_TextureData *data = (GLES2_TextureData *) texture->driverdata;
     GLenum magnificationScaleMode;
     GLenum minificationScaleMode;
+    GLboolean generateMipmaps = GL_FALSE;
 
     switch(texture->scaleMode) {
         case SDL_ScaleModeNearest:
@@ -1778,29 +1781,40 @@ GLES2_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Sc
             break;
         case SDL_ScaleModeBest:
             magnificationScaleMode = GL_LINEAR;
-            minificationScaleMode =  (data->texture_type == GL_TEXTURE_2D) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+            minificationScaleMode = (data->texture_type == GL_TEXTURE_2D) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+            generateMipmaps = (data->texture_type == GL_TEXTURE_2D) ? GL_TRUE : GL_FALSE;
             break;
         default:
             magnificationScaleMode = GL_NEAREST;
             minificationScaleMode = GL_NEAREST;
             break;
     }
+
 #if SDL_HAVE_YUV
     if (data->yuv) {
         renderdata->glActiveTexture(GL_TEXTURE2);
         renderdata->glBindTexture(data->texture_type, data->texture_v);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MIN_FILTER, minificationScaleMode);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MAG_FILTER, magnificationScaleMode);
+        if(generateMipmaps == GL_TRUE) {
+            renderdata->glGenerateMipmap(data->texture_type);
+        }
 
         renderdata->glActiveTexture(GL_TEXTURE1);
         renderdata->glBindTexture(data->texture_type, data->texture_u);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MIN_FILTER, minificationScaleMode);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MAG_FILTER, magnificationScaleMode);
+        if(generateMipmaps == GL_TRUE) {
+            renderdata->glGenerateMipmap(data->texture_type);
+        }
     } else if (data->nv12) {
         renderdata->glActiveTexture(GL_TEXTURE1);
         renderdata->glBindTexture(data->texture_type, data->texture_u);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MIN_FILTER, minificationScaleMode);
         renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MAG_FILTER, magnificationScaleMode);
+        if(generateMipmaps == GL_TRUE) {
+            renderdata->glGenerateMipmap(data->texture_type);
+        }
     }
 #endif
 
@@ -1808,6 +1822,10 @@ GLES2_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Sc
     renderdata->glBindTexture(data->texture_type, data->texture);
     renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MIN_FILTER, minificationScaleMode);
     renderdata->glTexParameteri(data->texture_type, GL_TEXTURE_MAG_FILTER, magnificationScaleMode);
+
+    if(generateMipmaps == GL_TRUE) {
+        renderdata->glGenerateMipmap(data->texture_type);
+    }
 }
 
 static int
