@@ -1337,7 +1337,6 @@ GLES2_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture)
     GLenum type;
     GLenum magnificationScaleMode;
     GLenum minificationScaleMode;
-    GLboolean generateMipmaps = GL_FALSE;
 
     GLES2_ActivateRenderer(renderer);
 
@@ -1505,7 +1504,7 @@ GLES2_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture)
         }
 
         /* Generate mipmaps for minification if scaling using mipmaps is enabled */
-        if(generateMipmaps == GL_TRUE) {
+        if(data->mipmap) {
             renderdata->glGenerateMipmap(data->texture_type);
         }
     }
