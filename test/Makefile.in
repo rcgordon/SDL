@@ -28,6 +28,7 @@ TARGETS = \
 	testfile$(EXE) \
 	testfilesystem$(EXE) \
 	testgamecontroller$(EXE) \
+	testgeometry$(EXE) \
 	testgesture$(EXE) \
 	testhaptic$(EXE) \
 	testhittesting$(EXE) \
@@ -157,7 +158,10 @@ testfile$(EXE): $(srcdir)/testfile.c
 
 testgamecontroller$(EXE): $(srcdir)/testgamecontroller.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
- 
+
+testgeometry$(EXE): $(srcdir)/testgeometry.c
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+
 testgesture$(EXE): $(srcdir)/testgesture.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS) @MATHLIB@
  
