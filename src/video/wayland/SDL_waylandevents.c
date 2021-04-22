@@ -40,7 +40,6 @@
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
-#include "xdg-shell-unstable-v6-client-protocol.h"
 #include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 
 #ifdef SDL_INPUT_LINUXEV
@@ -317,31 +316,17 @@ ProcessHitTest(struct SDL_WaylandInput *input, uint32_t serial)
         const SDL_Point point = { wl_fixed_to_int(input->sx_w), wl_fixed_to_int(input->sy_w) };
         const SDL_HitTestResult rc = window->hit_test(window, &point, window->hit_test_data);
 
-        static const uint32_t directions_wl[] = {
-            WL_SHELL_SURFACE_RESIZE_TOP_LEFT, WL_SHELL_SURFACE_RESIZE_TOP,
-            WL_SHELL_SURFACE_RESIZE_TOP_RIGHT, WL_SHELL_SURFACE_RESIZE_RIGHT,
-            WL_SHELL_SURFACE_RESIZE_BOTTOM_RIGHT, WL_SHELL_SURFACE_RESIZE_BOTTOM,
-            WL_SHELL_SURFACE_RESIZE_BOTTOM_LEFT, WL_SHELL_SURFACE_RESIZE_LEFT
+        static const uint32_t directions[] = {
+            XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT, XDG_TOPLEVEL_RESIZE_EDGE_TOP,
+            XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT, XDG_TOPLEVEL_RESIZE_EDGE_RIGHT,
+            XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT, XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM,
+            XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT, XDG_TOPLEVEL_RESIZE_EDGE_LEFT
         };
-
-        /* the names are different (ZXDG_TOPLEVEL_V6_RESIZE_EDGE_* vs
-           WL_SHELL_SURFACE_RESIZE_*), but the values are the same. */
-        const uint32_t *directions_zxdg = directions_wl;
 
         switch (rc) {
             case SDL_HITTEST_DRAGGABLE:
-                if (input->display->shell.xdg) {
-                    if (window_data->shell_surface.xdg.roleobj.toplevel) {
-                        xdg_toplevel_move(window_data->shell_surface.xdg.roleobj.toplevel,
-                                          input->seat,
-                                          serial);
-                    }
-                } else if (input->display->shell.zxdg) {
-                    if (window_data->shell_surface.zxdg.roleobj.toplevel) {
-                        zxdg_toplevel_v6_move(window_data->shell_surface.zxdg.roleobj.toplevel,
-                                              input->seat,
-                                              serial);
-                    }
+                if (window_data->xdg_shell_surface.roleobj.toplevel) {
+                    xdg_toplevel_move(window_data->xdg_shell_surface.roleobj.toplevel, input->seat, serial);
                 }
                 return SDL_TRUE;
 
@@ -353,20 +338,8 @@ ProcessHitTest(struct SDL_WaylandInput *input, uint32_t serial)
             case SDL_HITTEST_RESIZE_BOTTOM:
             case SDL_HITTEST_RESIZE_BOTTOMLEFT:
             case SDL_HITTEST_RESIZE_LEFT:
-                if (input->display->shell.xdg) {
-                    if (window_data->shell_surface.xdg.roleobj.toplevel) {
-                        xdg_toplevel_resize(window_data->shell_surface.xdg.roleobj.toplevel,
-                                            input->seat,
-                                            serial,
-                                            directions_zxdg[rc - SDL_HITTEST_RESIZE_TOPLEFT]);
-                    }
-                } else if (input->display->shell.zxdg) {
-                    if (window_data->shell_surface.zxdg.roleobj.toplevel) {
-                        zxdg_toplevel_v6_resize(window_data->shell_surface.zxdg.roleobj.toplevel,
-                                                input->seat,
-                                                serial,
-                                                directions_zxdg[rc - SDL_HITTEST_RESIZE_TOPLEFT]);
-                    }
+                if (window_data->xdg_shell_surface.roleobj.toplevel) {
+                    xdg_toplevel_resize(window_data->xdg_shell_surface.roleobj.toplevel, input->seat, serial, directions[rc - SDL_HITTEST_RESIZE_TOPLEFT]);
                 }
                 return SDL_TRUE;
 

@@ -34,7 +34,6 @@
 #include "SDL_hints.h"
 
 #include "xdg-shell-client-protocol.h"
-#include "xdg-shell-unstable-v6-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
 
@@ -46,7 +45,7 @@ static void
 CommitMinMaxDimensions(SDL_Window *window)
 {
     SDL_WindowData *wind = window->driverdata;
-    SDL_VideoData *data = wind->waylandData;
+    SDL_VideoData *viddata = wind->waylandData;
     int min_width, min_height, max_width, max_height;
 
     if (window->flags & SDL_WINDOW_FULLSCREEN) {
@@ -66,28 +65,17 @@ CommitMinMaxDimensions(SDL_Window *window)
         max_height = window->h;
     }
 
-    if (data->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
             return; /* Can't do anything yet, wait for ShowWindow */
         }
-        xdg_toplevel_set_min_size(wind->shell_surface.xdg.roleobj.toplevel,
+        xdg_toplevel_set_min_size(wind->xdg_shell_surface.roleobj.toplevel,
                                   min_width,
                                   min_height);
-        xdg_toplevel_set_max_size(wind->shell_surface.xdg.roleobj.toplevel,
+        xdg_toplevel_set_max_size(wind->xdg_shell_surface.roleobj.toplevel,
                                   max_width,
                                   max_height);
-    } else if (data->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return; /* Can't do anything yet, wait for ShowWindow */
-        }
-        zxdg_toplevel_v6_set_min_size(wind->shell_surface.zxdg.roleobj.toplevel,
-                                      min_width,
-                                      min_height);
-        zxdg_toplevel_v6_set_max_size(wind->shell_surface.zxdg.roleobj.toplevel,
-                                      max_width,
-                                      max_height);
     }
-
     wl_surface_commit(wind->surface);
 }
 
@@ -102,144 +90,19 @@ SetFullscreen(SDL_Window *window, struct wl_output *output)
      */
     CommitMinMaxDimensions(window);
 
-    if (viddata->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
             return; /* Can't do anything yet, wait for ShowWindow */
         }
         if (output) {
-            xdg_toplevel_set_fullscreen(wind->shell_surface.xdg.roleobj.toplevel, output);
+            xdg_toplevel_set_fullscreen(wind->xdg_shell_surface.roleobj.toplevel, output);
         } else {
-            xdg_toplevel_unset_fullscreen(wind->shell_surface.xdg.roleobj.toplevel);
-        }
-    } else if (viddata->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return; /* Can't do anything yet, wait for ShowWindow */
-        }
-        if (output) {
-            zxdg_toplevel_v6_set_fullscreen(wind->shell_surface.zxdg.roleobj.toplevel, output);
-        } else {
-            zxdg_toplevel_v6_unset_fullscreen(wind->shell_surface.zxdg.roleobj.toplevel);
+            xdg_toplevel_unset_fullscreen(wind->xdg_shell_surface.roleobj.toplevel);
         }
     }
 
     WAYLAND_wl_display_flush(viddata->display);
 }
-
-static void
-handle_configure_zxdg_shell_surface(void *data, struct zxdg_surface_v6 *zxdg, uint32_t serial)
-{
-    SDL_WindowData *wind = (SDL_WindowData *)data;
-    SDL_Window *window = wind->sdlwindow;
-    struct wl_region *region;
-
-    if (!wind->shell_surface.zxdg.initial_configure_seen) {
-        window->w = 0;
-        window->h = 0;
-        SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, wind->resize.width, wind->resize.height);
-        window->w = wind->resize.width;
-        window->h = wind->resize.height;
-
-        wl_surface_set_buffer_scale(wind->surface, get_window_scale_factor(window));
-        if (wind->egl_window) {
-            WAYLAND_wl_egl_window_resize(wind->egl_window, window->w * get_window_scale_factor(window), window->h * get_window_scale_factor(window), 0, 0);
-        }
-
-        zxdg_surface_v6_ack_configure(zxdg, serial);
-
-        region = wl_compositor_create_region(wind->waylandData->compositor);
-        wl_region_add(region, 0, 0, window->w, window->h);
-        wl_surface_set_opaque_region(wind->surface, region);
-        wl_region_destroy(region);
-
-        wind->shell_surface.zxdg.initial_configure_seen = SDL_TRUE;
-    } else {
-        wind->resize.pending = SDL_TRUE;
-        wind->resize.configure = SDL_TRUE;
-        wind->resize.serial = serial;
-        if (!(window->flags & SDL_WINDOW_OPENGL)) {
-            Wayland_HandlePendingResize(window);  /* OpenGL windows handle this in SwapWindow */
-        }
-    }
-}
-
-static const struct zxdg_surface_v6_listener shell_surface_listener_zxdg = {
-    handle_configure_zxdg_shell_surface
-};
-
-
-static void
-handle_configure_zxdg_toplevel(void *data,
-              struct zxdg_toplevel_v6 *zxdg_toplevel_v6,
-              int32_t width,
-              int32_t height,
-              struct wl_array *states)
-{
-    SDL_WindowData *wind = (SDL_WindowData *)data;
-    SDL_Window *window = wind->sdlwindow;
-
-    enum zxdg_toplevel_v6_state *state;
-    SDL_bool fullscreen = SDL_FALSE;
-    wl_array_for_each(state, states) {
-        if (*state == ZXDG_TOPLEVEL_V6_STATE_FULLSCREEN) {
-            fullscreen = SDL_TRUE;
-        }
-    }
-
-    if (!fullscreen) {
-        if (window->flags & SDL_WINDOW_FULLSCREEN) {
-            /* We might need to re-enter fullscreen after being restored from minimized */
-            SDL_WaylandOutputData *driverdata = (SDL_WaylandOutputData *) SDL_GetDisplayForWindow(window)->driverdata;
-            SetFullscreen(window, driverdata->output);
-        }
-
-        if (width == 0 || height == 0) {
-            width = window->windowed.w;
-            height = window->windowed.h;
-        }
-
-        /* zxdg_toplevel spec states that this is a suggestion.
-           Ignore if less than or greater than max/min size. */
-
-        if ((window->flags & SDL_WINDOW_RESIZABLE)) {
-            if (window->max_w > 0) {
-                width = SDL_min(width, window->max_w);
-            }
-            width = SDL_max(width, window->min_w);
-
-            if (window->max_h > 0) {
-                height = SDL_min(height, window->max_h);
-            }
-            height = SDL_max(height, window->min_h);
-        } else {
-            wind->resize.width = window->w;
-            wind->resize.height = window->h;
-            return;
-        }
-    }
-
-    if (width == 0 || height == 0) {
-        wind->resize.width = window->w;
-        wind->resize.height = window->h;
-        return;
-    }
-
-    wind->resize.width = width;
-    wind->resize.height = height;
-}
-
-static void
-handle_close_zxdg_toplevel(void *data, struct zxdg_toplevel_v6 *zxdg_toplevel_v6)
-{
-    SDL_WindowData *window = (SDL_WindowData *)data;
-    SDL_SendWindowEvent(window->sdlwindow, SDL_WINDOWEVENT_CLOSE, 0, 0);
-}
-
-static const struct zxdg_toplevel_v6_listener toplevel_listener_zxdg = {
-    handle_configure_zxdg_toplevel,
-    handle_close_zxdg_toplevel
-};
-
-
 
 static void
 handle_configure_xdg_shell_surface(void *data, struct xdg_surface *xdg, uint32_t serial)
@@ -248,7 +111,7 @@ handle_configure_xdg_shell_surface(void *data, struct xdg_surface *xdg, uint32_t
     SDL_Window *window = wind->sdlwindow;
     struct wl_region *region;
 
-    if (!wind->shell_surface.xdg.initial_configure_seen) {
+    if (!wind->xdg_shell_surface.initial_configure_seen) {
         window->w = 0;
         window->h = 0;
         SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, wind->resize.width, wind->resize.height);
@@ -267,7 +130,7 @@ handle_configure_xdg_shell_surface(void *data, struct xdg_surface *xdg, uint32_t
         wl_surface_set_opaque_region(wind->surface, region);
         wl_region_destroy(region);
 
-        wind->shell_surface.xdg.initial_configure_seen = SDL_TRUE;
+        wind->xdg_shell_surface.initial_configure_seen = SDL_TRUE;
     } else {
         wind->resize.pending = SDL_TRUE;
         wind->resize.configure = SDL_TRUE;
@@ -281,7 +144,6 @@ handle_configure_xdg_shell_surface(void *data, struct xdg_surface *xdg, uint32_t
 static const struct xdg_surface_listener shell_surface_listener_xdg = {
     handle_configure_xdg_shell_surface
 };
-
 
 static void
 handle_configure_xdg_toplevel(void *data,
@@ -354,9 +216,6 @@ static const struct xdg_toplevel_listener toplevel_listener_xdg = {
     handle_configure_xdg_toplevel,
     handle_close_xdg_toplevel
 };
-
-
-
 
 #ifdef SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH
 static void
@@ -536,33 +395,22 @@ Wayland_SetWindowHitTest(SDL_Window *window, SDL_bool enabled)
 int
 Wayland_SetWindowModalFor(_THIS, SDL_Window *modal_window, SDL_Window *parent_window)
 {
-    const SDL_VideoData *viddata = (const SDL_VideoData *) _this->driverdata;
+    SDL_VideoData *viddata = (SDL_VideoData *) _this->driverdata;
     SDL_WindowData *modal_data = modal_window->driverdata;
     SDL_WindowData *parent_data = parent_window->driverdata;
 
-    if (viddata->shell.xdg) {
-        if (modal_data->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        if (modal_data->xdg_shell_surface.roleobj.toplevel == NULL) {
             return SDL_SetError("Modal window was hidden");
         }
-        if (parent_data->shell_surface.xdg.roleobj.toplevel == NULL) {
+        if (parent_data->xdg_shell_surface.roleobj.toplevel == NULL) {
             return SDL_SetError("Parent window was hidden");
         }
-        xdg_toplevel_set_parent(modal_data->shell_surface.xdg.roleobj.toplevel,
-                                parent_data->shell_surface.xdg.roleobj.toplevel);
-    } else if (viddata->shell.zxdg) {
-        if (modal_data->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return SDL_SetError("Modal window was hidden");
-        }
-        if (parent_data->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return SDL_SetError("Parent window was hidden");
-        }
-        zxdg_toplevel_v6_set_parent(modal_data->shell_surface.zxdg.roleobj.toplevel,
-                                    parent_data->shell_surface.zxdg.roleobj.toplevel);
-    } else {
-        return SDL_Unsupported();
+        xdg_toplevel_set_parent(modal_data->xdg_shell_surface.roleobj.toplevel,
+                parent_data->xdg_shell_surface.roleobj.toplevel);
     }
 
-    WAYLAND_wl_display_flush( ((SDL_VideoData*)_this->driverdata)->display );
+    WAYLAND_wl_display_flush(viddata->display);
     return 0;
 }
 
@@ -579,34 +427,18 @@ void Wayland_ShowWindow(_THIS, SDL_Window *window)
     wl_surface_commit(data->surface);
 
     /* Create the shell surface and map the toplevel */
-    if (c->shell.xdg) {
-        data->shell_surface.xdg.surface = xdg_wm_base_get_xdg_surface(c->shell.xdg, data->surface);
-        xdg_surface_set_user_data(data->shell_surface.xdg.surface, data);
-        xdg_surface_add_listener(data->shell_surface.xdg.surface, &shell_surface_listener_xdg, data);
+    data->xdg_shell_surface.surface = xdg_wm_base_get_xdg_surface(c->xdg_shell, data->surface);
+    xdg_surface_set_user_data(data->xdg_shell_surface.surface, data);
+    xdg_surface_add_listener(data->xdg_shell_surface.surface, &shell_surface_listener_xdg, data);
 
-        /* !!! FIXME: add popup role */
-        data->shell_surface.xdg.roleobj.toplevel = xdg_surface_get_toplevel(data->shell_surface.xdg.surface);
-        xdg_toplevel_set_app_id(data->shell_surface.xdg.roleobj.toplevel, c->classname);
-        xdg_toplevel_add_listener(data->shell_surface.xdg.roleobj.toplevel, &toplevel_listener_xdg, data);
+    /* !!! FIXME: add popup role */
+    data->xdg_shell_surface.roleobj.toplevel = xdg_surface_get_toplevel(data->xdg_shell_surface.surface);
+    xdg_toplevel_set_app_id(data->xdg_shell_surface.roleobj.toplevel, c->classname);
+    xdg_toplevel_add_listener(data->xdg_shell_surface.roleobj.toplevel, &toplevel_listener_xdg, data);
 
-        /* Create the window decorations */
-        if (c->decoration_manager) {
-            data->server_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(c->decoration_manager, data->shell_surface.xdg.roleobj.toplevel);
-        }
-    } else if (c->shell.zxdg) {
-        data->shell_surface.zxdg.surface = zxdg_shell_v6_get_xdg_surface(c->shell.zxdg, data->surface);
-        zxdg_surface_v6_set_user_data(data->shell_surface.zxdg.surface, data);
-        zxdg_surface_v6_add_listener(data->shell_surface.zxdg.surface, &shell_surface_listener_zxdg, data);
-
-        /* !!! FIXME: add popup role */
-        data->shell_surface.zxdg.roleobj.toplevel = zxdg_surface_v6_get_toplevel(data->shell_surface.zxdg.surface);
-        zxdg_toplevel_v6_add_listener(data->shell_surface.zxdg.roleobj.toplevel, &toplevel_listener_zxdg, data);
-        zxdg_toplevel_v6_set_app_id(data->shell_surface.zxdg.roleobj.toplevel, c->classname);
-    } else {
-        data->shell_surface.wl = wl_shell_get_shell_surface(c->shell.wl, data->surface);
-        wl_shell_surface_set_class(data->shell_surface.wl, c->classname);
-        wl_shell_surface_set_user_data(data->shell_surface.wl, data);
-        wl_shell_surface_add_listener(data->shell_surface.wl, &shell_surface_listener_wl, data);
+    /* Create the window decorations */
+    if (c->decoration_manager) {
+        data->server_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(c->decoration_manager, data->xdg_shell_surface.roleobj.toplevel);
     }
 
     /* Restore state that was set prior to this call */
@@ -623,26 +455,16 @@ void Wayland_ShowWindow(_THIS, SDL_Window *window)
     /* We have to wait until the surface gets a "configure" event, or use of
      * this surface will fail. This is a new rule for xdg_shell.
      */
-    if (c->shell.xdg) {
-        if (data->shell_surface.xdg.surface) {
-            while (!data->shell_surface.xdg.initial_configure_seen) {
-                WAYLAND_wl_display_flush(c->display);
-                WAYLAND_wl_display_dispatch(c->display);
-            }
-        }
-    } else if (c->shell.zxdg) {
-        if (data->shell_surface.zxdg.surface) {
-            while (!data->shell_surface.zxdg.initial_configure_seen) {
-                WAYLAND_wl_display_flush(c->display);
-                WAYLAND_wl_display_dispatch(c->display);
-            }
+    if (data->xdg_shell_surface.surface) {
+        while (!data->xdg_shell_surface.initial_configure_seen) {
+            WAYLAND_wl_display_flush(c->display);
+            WAYLAND_wl_display_dispatch(c->display);
         }
     }
 }
 
 void Wayland_HideWindow(_THIS, SDL_Window *window)
 {
-    SDL_VideoData *data = _this->driverdata;
     SDL_WindowData *wind = window->driverdata;
 
     if (wind->server_decoration) {
@@ -650,24 +472,13 @@ void Wayland_HideWindow(_THIS, SDL_Window *window)
        wind->server_decoration = NULL;
     }
 
-    if (data->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel) {
-            xdg_toplevel_destroy(wind->shell_surface.xdg.roleobj.toplevel);
-            wind->shell_surface.xdg.roleobj.toplevel = NULL;
-        }
-        if (wind->shell_surface.xdg.surface) {
-            xdg_surface_destroy(wind->shell_surface.xdg.surface);
-            wind->shell_surface.xdg.surface = NULL;
-        }
-    } else if (data->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel) {
-            zxdg_toplevel_v6_destroy(wind->shell_surface.zxdg.roleobj.toplevel);
-            wind->shell_surface.zxdg.roleobj.toplevel = NULL;
-        }
-        if (wind->shell_surface.zxdg.surface) {
-            zxdg_surface_v6_destroy(wind->shell_surface.zxdg.surface);
-            wind->shell_surface.zxdg.surface = NULL;
-        }
+    if (wind->xdg_shell_surface.roleobj.toplevel) {
+        xdg_toplevel_destroy(wind->xdg_shell_surface.roleobj.toplevel);
+        wind->xdg_shell_surface.roleobj.toplevel = NULL;
+    }
+    if (wind->xdg_shell_surface.surface) {
+        xdg_surface_destroy(wind->xdg_shell_surface.surface);
+        wind->xdg_shell_surface.surface = NULL;
     }
 }
 
@@ -749,22 +560,17 @@ void
 Wayland_RestoreWindow(_THIS, SDL_Window * window)
 {
     SDL_WindowData *wind = window->driverdata;
-    const SDL_VideoData *viddata = (const SDL_VideoData *) _this->driverdata;
+    SDL_VideoData *viddata = (SDL_VideoData *) _this->driverdata;
 
-    /* Note that xdg-shell does NOT provide a way to unset minimize! */
-    if (viddata->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        /* Note that xdg-shell does NOT provide a way to unset minimize! */
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
             return; /* Can't do anything yet, wait for ShowWindow */
         }
-        xdg_toplevel_unset_maximized(wind->shell_surface.xdg.roleobj.toplevel);
-    } else if (viddata->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return; /* Can't do anything yet, wait for ShowWindow */
-        }
-        zxdg_toplevel_v6_unset_maximized(wind->shell_surface.zxdg.roleobj.toplevel);
+        xdg_toplevel_unset_maximized(wind->xdg_shell_surface.roleobj.toplevel);
     }
 
-    WAYLAND_wl_display_flush( ((SDL_VideoData*)_this->driverdata)->display );
+    WAYLAND_wl_display_flush( viddata->display );
 }
 
 void
@@ -790,16 +596,11 @@ Wayland_MaximizeWindow(_THIS, SDL_Window * window)
     SDL_WindowData *wind = window->driverdata;
     SDL_VideoData *viddata = (SDL_VideoData *) _this->driverdata;
 
-    if (viddata->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
             return; /* Can't do anything yet, wait for ShowWindow */
         }
-        xdg_toplevel_set_maximized(wind->shell_surface.xdg.roleobj.toplevel);
-    } else if (viddata->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return; /* Can't do anything yet, wait for ShowWindow */
-        }
-        zxdg_toplevel_v6_set_maximized(wind->shell_surface.zxdg.roleobj.toplevel);
+        xdg_toplevel_set_maximized(wind->xdg_shell_surface.roleobj.toplevel);
     }
 
     WAYLAND_wl_display_flush( viddata->display );
@@ -811,16 +612,11 @@ Wayland_MinimizeWindow(_THIS, SDL_Window * window)
     SDL_WindowData *wind = window->driverdata;
     SDL_VideoData *viddata = (SDL_VideoData *) _this->driverdata;
 
-    if (viddata->shell.xdg) {
-        if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
+    if (viddata->xdg_shell) {
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
             return; /* Can't do anything yet, wait for ShowWindow */
         }
-        xdg_toplevel_set_minimized(wind->shell_surface.xdg.roleobj.toplevel);
-    } else if (viddata->shell.zxdg) {
-        if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-            return; /* Can't do anything yet, wait for ShowWindow */
-        }
-        zxdg_toplevel_v6_set_minimized(wind->shell_surface.zxdg.roleobj.toplevel);
+        xdg_toplevel_set_minimized(wind->xdg_shell_surface.roleobj.toplevel);
     }
 
     WAYLAND_wl_display_flush(viddata->display);
@@ -974,12 +770,8 @@ Wayland_HandlePendingResize(SDL_Window *window)
         }
 
         if (data->resize.configure) {
-           if (data->waylandData->shell.xdg) {
-              xdg_surface_ack_configure(data->shell_surface.xdg.surface, data->resize.serial);
-           } else if (data->waylandData->shell.zxdg) {
-              zxdg_surface_v6_ack_configure(data->shell_surface.zxdg.surface, data->resize.serial);
-           }
-           data->resize.configure = SDL_FALSE;
+            xdg_surface_ack_configure(data->xdg_shell_surface.surface, data->resize.serial);
+            data->resize.configure = SDL_FALSE;
         }
 
         region = wl_compositor_create_region(data->waylandData->compositor);
@@ -1024,23 +816,16 @@ void Wayland_SetWindowSize(_THIS, SDL_Window * window)
 void Wayland_SetWindowTitle(_THIS, SDL_Window * window)
 {
     SDL_WindowData *wind = window->driverdata;
-    SDL_VideoData *viddata = (SDL_VideoData *) _this->driverdata;
+    SDL_VideoData *data = _this->driverdata;
 
-    if (window->title != NULL) {
-        if (viddata->shell.xdg) {
-            if (wind->shell_surface.xdg.roleobj.toplevel == NULL) {
-                return; /* Can't do anything yet, wait for ShowWindow */
-            }
-            xdg_toplevel_set_title(wind->shell_surface.xdg.roleobj.toplevel, window->title);
-        } else if (viddata->shell.zxdg) {
-            if (wind->shell_surface.zxdg.roleobj.toplevel == NULL) {
-                return; /* Can't do anything yet, wait for ShowWindow */
-            }
-            zxdg_toplevel_v6_set_title(wind->shell_surface.zxdg.roleobj.toplevel, window->title);
+    if (data->xdg_shell && window->title != NULL) {
+        if (wind->xdg_shell_surface.roleobj.toplevel == NULL) {
+            return; /* Can't do anything yet, wait for ShowWindow */
         }
+        xdg_toplevel_set_title(wind->xdg_shell_surface.roleobj.toplevel, window->title);
     }
 
-    WAYLAND_wl_display_flush( ((SDL_VideoData*)_this->driverdata)->display );
+    WAYLAND_wl_display_flush(data->display);
 }
 
 void

@@ -47,7 +47,6 @@
 #include <wayland-util.h>
 
 #include "xdg-shell-client-protocol.h"
-#include "xdg-shell-unstable-v6-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
@@ -407,18 +406,6 @@ static const struct qt_windowmanager_listener windowmanager_listener = {
 };
 #endif /* SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH */
 
-
-static void
-handle_ping_zxdg_shell(void *data, struct zxdg_shell_v6 *zxdg, uint32_t serial)
-{
-    zxdg_shell_v6_pong(zxdg, serial);
-}
-
-static const struct zxdg_shell_v6_listener shell_listener_zxdg = {
-    handle_ping_zxdg_shell
-};
-
-
 static void
 handle_ping_xdg_wm_base(void *data, struct xdg_wm_base *xdg, uint32_t serial)
 {
@@ -445,11 +432,8 @@ display_handle_global(void *data, struct wl_registry *registry, uint32_t id,
     } else if (strcmp(interface, "wl_seat") == 0) {
         Wayland_display_add_input(d, id, version);
     } else if (strcmp(interface, "xdg_wm_base") == 0) {
-        d->shell.xdg = wl_registry_bind(d->registry, id, &xdg_wm_base_interface, 1);
-        xdg_wm_base_add_listener(d->shell.xdg, &shell_listener_xdg, NULL);
-    } else if (strcmp(interface, "zxdg_shell_v6") == 0) {
-        d->shell.zxdg = wl_registry_bind(d->registry, id, &zxdg_shell_v6_interface, 1);
-        zxdg_shell_v6_add_listener(d->shell.zxdg, &shell_listener_zxdg, NULL);
+        d->xdg_shell = wl_registry_bind(d->registry, id, &xdg_wm_base_interface, 1);
+        xdg_wm_base_add_listener(d->xdg_shell, &shell_listener_xdg, NULL);
     } else if (strcmp(interface, "wl_shm") == 0) {
         d->shm = wl_registry_bind(registry, id, &wl_shm_interface, 1);
         d->cursor_theme = WAYLAND_wl_cursor_theme_load(NULL, 32, d->shm);
@@ -610,11 +594,8 @@ Wayland_VideoQuit(_THIS)
     if (data->cursor_theme)
         WAYLAND_wl_cursor_theme_destroy(data->cursor_theme);
 
-    if (data->shell.xdg)
-        xdg_wm_base_destroy(data->shell.xdg);
-
-    if (data->shell.zxdg)
-        zxdg_shell_v6_destroy(data->shell.zxdg);
+    if (data->xdg_shell)
+        xdg_wm_base_destroy(data->xdg_shell);
 
     if (data->decoration_manager)
         zxdg_decoration_manager_v1_destroy(data->decoration_manager);
