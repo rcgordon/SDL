@@ -57,7 +57,6 @@ typedef struct {
     union {
         SDL_xdg_shell_surface xdg;
         SDL_zxdg_shell_surface zxdg;
-        struct wl_shell_surface *wl;
     } shell_surface;
     struct wl_egl_window *egl_window;
     struct SDL_WaylandInput *keyboard_device;
