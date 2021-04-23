@@ -20,22 +20,32 @@
 */
 #include "../../SDL_internal.h"
 
-#ifndef SDL_diskaudio_h_
-#define SDL_diskaudio_h_
+#ifndef _SDL_aaudio_h
+#define _SDL_aaudio_h
 
-#include "SDL_rwops.h"
 #include "../SDL_sysaudio.h"
+#include <aaudio/AAudio.h>
 
 /* Hidden "this" pointer for the audio functions */
-#define _THIS   SDL_AudioDevice *_this
+#define _THIS   SDL_AudioDevice *this
 
 struct SDL_PrivateAudioData
 {
-    /* The file descriptor for the audio device */
-    SDL_RWops *io;
-    Uint32 io_delay;
-    Uint8 *mixbuf;
-};
+    AAudioStream *stream;
 
-#endif /* SDL_diskaudio_h_ */
+    /* Raw mixing buffer */
+    Uint8 *mixbuf;
+    int mixlen;
+    int frame_size;
+
+    /* Resume device if it was paused automatically */
+    int resume;
+};
+ 
+void aaudio_ResumeDevices(void);
+void aaudio_PauseDevices(void);
+
+
+#endif /* _SDL_aaudio_h */
+
 /* vi: set ts=4 sw=4 expandtab: */

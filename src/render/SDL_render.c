@@ -32,6 +32,18 @@
 #  include "../core/android/SDL_android.h"
 #endif
 
+/* as a courtesy to iOS apps, we don't try to draw when in the background, as
+that will crash the app. However, these apps _should_ have used
+SDL_AddEventWatch to catch SDL_APP_WILLENTERBACKGROUND events and stopped
+drawing themselves. Other platforms still draw, as the compositor can use it,
+and more importantly: drawing to render targets isn't lost. But I still think
+this should probably be removed at some point in the future.  --ryan. */
+#if defined(__IPHONEOS__) || defined(__TVOS__) || defined(__ANDROID__)
+#define DONT_DRAW_WHILE_HIDDEN 1
+#else
+#define DONT_DRAW_WHILE_HIDDEN 0
+#endif
+
 #define SDL_WINDOWRENDERDATA    "_SDL_WindowRenderData"
 
 #define CHECK_RENDERER_MAGIC(renderer, retval) \
@@ -1113,6 +1125,7 @@ SDL_Texture *
 SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
 {
     SDL_Texture *texture;
+    SDL_bool texture_is_fourcc_and_target;
 
     CHECK_RENDERER_MAGIC(renderer, NULL);
 
@@ -1158,15 +1171,24 @@ SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int
     }
     renderer->textures = texture;
 
-    if (IsSupportedFormat(renderer, format)) {
+    /* FOURCC format cannot be used directly by renderer back-ends for target texture */
+    texture_is_fourcc_and_target = (access == SDL_TEXTUREACCESS_TARGET && SDL_ISPIXELFORMAT_FOURCC(texture->format));
+
+    if (texture_is_fourcc_and_target == SDL_FALSE && IsSupportedFormat(renderer, format)) {
         if (renderer->CreateTexture(renderer, texture) < 0) {
             SDL_DestroyTexture(texture);
             return NULL;
         }
     } else {
-        texture->native = SDL_CreateTexture(renderer,
-                                GetClosestSupportedFormat(renderer, format),
-                                access, w, h);
+        int closest_format;
+
+        if (texture_is_fourcc_and_target == SDL_FALSE) {
+            closest_format = GetClosestSupportedFormat(renderer, format);
+        } else {
+            closest_format = renderer->info.texture_formats[0];
+        }
+
+        texture->native = SDL_CreateTexture(renderer, closest_format, access, w, h);
         if (!texture->native) {
             SDL_DestroyTexture(texture);
             return NULL;
@@ -2520,10 +2542,12 @@ SDL_RenderDrawPoints(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     if (renderer->scale.x != 1.0f || renderer->scale.y != 1.0f) {
         return RenderDrawPointsWithRects(renderer, points, count);
@@ -2590,10 +2614,12 @@ SDL_RenderDrawPointsF(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     if (renderer->scale.x != 1.0f || renderer->scale.y != 1.0f) {
         return RenderDrawPointsWithRectsF(renderer, points, count);
@@ -2765,10 +2791,12 @@ SDL_RenderDrawLines(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     if (renderer->scale.x != 1.0f || renderer->scale.y != 1.0f) {
         return RenderDrawLinesWithRects(renderer, points, count);
@@ -2808,10 +2836,12 @@ SDL_RenderDrawLinesF(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     if (renderer->scale.x != 1.0f || renderer->scale.y != 1.0f) {
         return RenderDrawLinesWithRectsF(renderer, points, count);
@@ -2892,10 +2922,12 @@ SDL_RenderDrawRects(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     for (i = 0; i < count; ++i) {
         if (SDL_RenderDrawRect(renderer, &rects[i]) < 0) {
@@ -2920,10 +2952,12 @@ SDL_RenderDrawRectsF(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     for (i = 0; i < count; ++i) {
         if (SDL_RenderDrawRectF(renderer, &rects[i]) < 0) {
@@ -2985,10 +3019,12 @@ SDL_RenderFillRects(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     frects = SDL_small_alloc(SDL_FRect, count, &isstack);
     if (!frects) {
@@ -3026,10 +3062,12 @@ SDL_RenderFillRectsF(SDL_Renderer * renderer,
         return 0;
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     frects = SDL_small_alloc(SDL_FRect, count, &isstack);
     if (!frects) {
@@ -3134,10 +3172,12 @@ SDL_RenderCopyF(SDL_Renderer * renderer, SDL_Texture * texture,
         return SDL_SetError("Texture was not created with this renderer");
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     real_srcrect.x = 0;
     real_srcrect.y = 0;
@@ -3223,10 +3263,12 @@ SDL_RenderCopyExF(SDL_Renderer * renderer, SDL_Texture * texture,
         return SDL_SetError("Renderer does not support RenderCopyEx");
     }
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't draw while we're hidden */
     if (renderer->hidden) {
         return 0;
     }
+#endif
 
     real_srcrect.x = 0;
     real_srcrect.y = 0;
@@ -3791,10 +3833,13 @@ SDL_RenderPresent(SDL_Renderer * renderer)
 
     FlushRenderCommands(renderer);  /* time to send everything to the GPU! */
 
+#if DONT_DRAW_WHILE_HIDDEN
     /* Don't present while we're hidden */
     if (renderer->hidden) {
         return;
     }
+#endif
+
     renderer->RenderPresent(renderer);
 }
 

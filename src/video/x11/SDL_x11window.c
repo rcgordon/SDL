@@ -668,6 +668,8 @@ X11_CreateWindow(_THIS, SDL_Window * window)
                  PropertyChangeMask | StructureNotifyMask |
                  KeymapStateMask | fevent));
 
+    X11_XkbSelectEvents(display, XkbUseCoreKbd, XkbStateNotifyMask, XkbStateNotifyMask);
+
     X11_XFlush(display);
 
     return 0;
@@ -1104,6 +1106,36 @@ X11_SetWindowResizable(_THIS, SDL_Window * window, SDL_bool resizable)
     X11_XMoveWindow(display, data->xwindow, window->x - data->border_left, window->y - data->border_top);
     X11_XRaiseWindow(display, data->xwindow);
 
+    X11_XFlush(display);
+}
+
+void
+X11_SetWindowAlwaysOnTop(_THIS, SDL_Window * window, SDL_bool on_top)
+{
+    SDL_WindowData *data = (SDL_WindowData *) window->driverdata;
+    SDL_DisplayData *displaydata = (SDL_DisplayData *) SDL_GetDisplayForWindow(window)->driverdata;
+    Display *display = data->videodata->display;
+    Atom _NET_WM_STATE = data->videodata->_NET_WM_STATE;
+    Atom _NET_WM_STATE_ABOVE = data->videodata->_NET_WM_STATE_ABOVE;
+
+    if (X11_IsWindowMapped(_this, window)) {
+        XEvent e;
+
+        SDL_zero(e);
+        e.xany.type = ClientMessage;
+        e.xclient.message_type = _NET_WM_STATE;
+        e.xclient.format = 32;
+        e.xclient.window = data->xwindow;
+        e.xclient.data.l[0] =
+            on_top ? _NET_WM_STATE_ADD : _NET_WM_STATE_REMOVE;
+        e.xclient.data.l[1] = _NET_WM_STATE_ABOVE;
+        e.xclient.data.l[3] = 0l;
+
+        X11_XSendEvent(display, RootWindow(display, displaydata->screen), 0,
+                   SubstructureNotifyMask | SubstructureRedirectMask, &e);
+    } else {
+        X11_SetNetWMState(_this, data->xwindow, window->flags);
+    }
     X11_XFlush(display);
 }
 
