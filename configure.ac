@@ -3168,20 +3168,26 @@ XINPUT_STATE_EX s1;
 dnl Check for the dlfcn.h interface for dynamically loading objects
 CheckDLOPEN()
 {
+dnl NOTE: CheckDLOPEN is called only for relevant platforms.
+    AC_DEFINE(DYNAPI_NEEDS_DLOPEN, 1, [ ])
+
+    AC_MSG_CHECKING(for dlopen)
+    have_dlopen=no
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+     #include <dlfcn.h>
+    ]], [[
+     void *handle = dlopen("", RTLD_NOW);
+     const char *loaderror = (char *) dlerror();
+    ]])], [have_dlopen=yes],[])
+    AC_MSG_RESULT($have_dlopen)
+    if test x$have_dlopen = xyes; then
+       AC_DEFINE(HAVE_DLOPEN, 1, [ ])
+    fi
+
     AC_ARG_ENABLE(sdl-dlopen,
 [AS_HELP_STRING([--enable-sdl-dlopen], [use dlopen for shared object loading [default=yes]])],
                   , enable_sdl_dlopen=yes)
     if test x$enable_sdl_dlopen = xyes; then
-        AC_MSG_CHECKING(for dlopen)
-        have_dlopen=no
-        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-         #include <dlfcn.h>
-        ]], [[
-         void *handle = dlopen("", RTLD_NOW);
-         const char *loaderror = (char *) dlerror();
-        ]])], [have_dlopen=yes],[])
-        AC_MSG_RESULT($have_dlopen)
-
         if test x$have_dlopen = xyes; then
             AC_CHECK_LIB(c, dlopen, EXTRA_LDFLAGS="$EXTRA_LDFLAGS",
                AC_CHECK_LIB(dl, dlopen, EXTRA_LDFLAGS="$EXTRA_LDFLAGS -ldl",

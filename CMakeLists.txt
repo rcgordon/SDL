@@ -937,10 +937,15 @@ if(SDL_AUDIO)
   endif()
 endif()
 
-if(SDL_DLOPEN)
+if(UNIX OR APPLE)
   # Relevant for Unix/Darwin only
-  if(UNIX OR APPLE)
-    CheckDLOPEN()
+  CheckDLOPEN()
+  if(SDL_DLOPEN AND HAVE_DLOPEN)
+    set(SDL_LOADSO_DLOPEN 1)
+    set(HAVE_SDL_DLOPEN TRUE)
+    file(GLOB DLOPEN_SOURCES ${SDL2_SOURCE_DIR}/src/loadso/dlopen/*.c)
+    set(SOURCE_FILES ${SOURCE_FILES} ${DLOPEN_SOURCES})
+    set(HAVE_SDL_LOADSO TRUE)
   endif()
 endif()
 

@@ -24041,28 +24041,24 @@ fi
 
 CheckDLOPEN()
 {
-    # Check whether --enable-sdl-dlopen was given.
-if test "${enable_sdl_dlopen+set}" = set; then :
-  enableval=$enable_sdl_dlopen;
-else
-  enable_sdl_dlopen=yes
-fi
 
-    if test x$enable_sdl_dlopen = xyes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen" >&5
+$as_echo "#define DYNAPI_NEEDS_DLOPEN 1" >>confdefs.h
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen" >&5
 $as_echo_n "checking for dlopen... " >&6; }
-        have_dlopen=no
-        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+    have_dlopen=no
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-         #include <dlfcn.h>
+     #include <dlfcn.h>
 
 int
 main ()
 {
 
-         void *handle = dlopen("", RTLD_NOW);
-         const char *loaderror = (char *) dlerror();
+     void *handle = dlopen("", RTLD_NOW);
+     const char *loaderror = (char *) dlerror();
 
   ;
   return 0;
@@ -24072,9 +24068,22 @@ if ac_fn_c_try_compile "$LINENO"; then :
   have_dlopen=yes
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $have_dlopen" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $have_dlopen" >&5
 $as_echo "$have_dlopen" >&6; }
+    if test x$have_dlopen = xyes; then
 
+$as_echo "#define HAVE_DLOPEN 1" >>confdefs.h
+
+    fi
+
+    # Check whether --enable-sdl-dlopen was given.
+if test "${enable_sdl_dlopen+set}" = set; then :
+  enableval=$enable_sdl_dlopen;
+else
+  enable_sdl_dlopen=yes
+fi
+
+    if test x$enable_sdl_dlopen = xyes; then
         if test x$have_dlopen = xyes; then
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -lc" >&5
 $as_echo_n "checking for dlopen in -lc... " >&6; }
