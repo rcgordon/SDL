@@ -23,6 +23,14 @@
 #ifndef SDL_waylandkeyboard_h_
 #define SDL_waylandkeyboard_h_
 
+typedef struct SDL_WaylandTextInput
+{
+    struct zwp_text_input_v3 *text_input;
+    SDL_bool got_text;
+    SDL_Rect cursor_rect;
+    SDL_VideoData *video_data;
+} SDL_WaylandTextInput;
+
 extern int Wayland_InitKeyboard(_THIS);
 extern void Wayland_QuitKeyboard(_THIS);
 extern void Wayland_StartTextInput(_THIS);

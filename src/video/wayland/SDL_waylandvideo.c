@@ -52,6 +52,7 @@
 #include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
 #include "xdg-activation-v1-client-protocol.h"
+#include "text-input-unstable-v3-client-protocol.h"
 
 #define WAYLANDVID_DRIVER_NAME "wayland"
 
@@ -467,6 +468,8 @@ display_handle_global(void *data, struct wl_registry *registry, uint32_t id,
         d->idle_inhibit_manager = wl_registry_bind(d->registry, id, &zwp_idle_inhibit_manager_v1_interface, 1);
     } else if (strcmp(interface, "xdg_activation_v1") == 0) {
         d->activation_manager = wl_registry_bind(d->registry, id, &xdg_activation_v1_interface, 1);
+    } else if (strcmp(interface, "zwp_text_input_manager_v3") == 0) {
+        Wayland_add_text_input_manager(d, id, version);
     } else if (strcmp(interface, "wl_data_device_manager") == 0) {
         Wayland_add_data_device_manager(d, id, version);
     } else if (strcmp(interface, "zxdg_decoration_manager_v1") == 0) {
@@ -596,6 +599,11 @@ Wayland_VideoQuit(_THIS)
     if (data->key_inhibitor_manager)
         zwp_keyboard_shortcuts_inhibit_manager_v1_destroy(data->key_inhibitor_manager);
 
+    Wayland_QuitKeyboard(_this);
+
+    if (data->text_input_manager)
+        zwp_text_input_manager_v3_destroy(data->text_input_manager);
+
     if (data->xkb_context) {
         WAYLAND_xkb_context_unref(data->xkb_context);
         data->xkb_context = NULL;
@@ -636,8 +644,6 @@ Wayland_VideoQuit(_THIS)
 
     if (data->registry)
         wl_registry_destroy(data->registry);
-
-    Wayland_QuitKeyboard(_this);
 
     SDL_free(data->classname);
 }
