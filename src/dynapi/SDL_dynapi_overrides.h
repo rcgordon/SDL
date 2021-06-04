@@ -811,3 +811,5 @@
 #define SDL_GetAudioDeviceSpec SDL_GetAudioDeviceSpec_REAL
 #define SDL_TLSCleanup SDL_TLSCleanup_REAL
 #define SDL_SetWindowAlwaysOnTop SDL_SetWindowAlwaysOnTop_REAL
+#define SDL_RenderGeometryRaw SDL_RenderGeometryRaw_REAL
+#define SDL_RenderGeometry SDL_RenderGeometry_REAL
