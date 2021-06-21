@@ -568,6 +568,7 @@ decoration_frame_configure(struct libdecor_frame *frame,
     if (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN) {
         window->flags |= SDL_WINDOW_FULLSCREEN;
     } else {
+        window->flags &= ~SDL_WINDOW_FULLSCREEN;
         if (window->flags & SDL_WINDOW_FULLSCREEN) {
             /* We might need to re-enter fullscreen after being restored from minimized */
             SDL_WaylandOutputData *driverdata = (SDL_WaylandOutputData *) SDL_GetDisplayForWindow(window)->driverdata;
@@ -579,7 +580,6 @@ decoration_frame_configure(struct libdecor_frame *frame,
                                     SDL_WINDOWEVENT_RESTORED,
                                 0, 0);
         }
-        window->flags &= ~SDL_WINDOW_FULLSCREEN;
     }
     SDL_SendWindowEvent(window,
                         (window_state & LIBDECOR_WINDOW_STATE_ACTIVE) ?
@@ -1540,6 +1540,15 @@ void Wayland_SetWindowSize(_THIS, SDL_Window * window)
     struct wl_region *region;
 #ifdef HAVE_LIBDECOR_H
     struct libdecor_state *state;
+#endif
+
+#ifdef HAVE_LIBDECOR_H
+    /* we must not resize the window while we have a static (non-floating) size */
+    if (data->shell.libdecor &&
+        wind->shell_surface.libdecor.frame &&
+        !libdecor_frame_is_floating(wind->shell_surface.libdecor.frame)) {
+            return;
+    }
 #endif
 
     wl_surface_set_buffer_scale(wind->surface, get_window_scale_factor(window));
