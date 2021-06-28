@@ -24,6 +24,7 @@
 
 #include "SDL_hints.h"
 #include "../SDL_sysrender.h"
+#include "../../SDL_hints_c.h"
 
 #include <pspkernel.h>
 #include <pspdisplay.h>
@@ -901,9 +902,18 @@ PSP_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 }
 
 static void
+PSP_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    PSP_RenderData *data = renderer->driverdata;
+    data->vsync = SDL_GetStringBoolean(newValue, SDL_FALSE);
+}
+
+static void
 PSP_DestroyRenderer(SDL_Renderer * renderer)
 {
     PSP_RenderData *data = (PSP_RenderData *) renderer->driverdata;
+    SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, PSP_UpdateVSync, renderer);
     if (data) {
         if (!data->initialized)
             return;
@@ -976,6 +986,8 @@ PSP_CreateRenderer(SDL_Window * window, Uint32 flags)
     } else {
         data->vsync = SDL_FALSE;
     }
+
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, PSP_UpdateVSync, renderer);
 
     pixelformat=PixelFormatToPSPFMT(SDL_GetWindowPixelFormat(window));
     switch(pixelformat)

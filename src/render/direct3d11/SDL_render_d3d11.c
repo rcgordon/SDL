@@ -32,6 +32,7 @@
 #include "SDL_syswm.h"
 #include "../SDL_sysrender.h"
 #include "../SDL_d3dmath.h"
+#include "../../SDL_hints_c.h"
 
 #include <d3d11_1.h>
 
@@ -295,10 +296,30 @@ D3D11_ReleaseAll(SDL_Renderer * renderer)
     }
 }
 
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+    /* no-op. */
+#else
+static void
+D3D11_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+        renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+    } else {
+        renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+    }
+}
+#endif
+
 static void
 D3D11_DestroyRenderer(SDL_Renderer * renderer)
 {
     D3D11_RenderData *data = (D3D11_RenderData *) renderer->driverdata;
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+    /* no-op. */
+#else
+    SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, D3D11_UpdateVSync, renderer);
+#endif
     D3D11_ReleaseAll(renderer);
     if (data) {
         SDL_free(data);
@@ -2586,6 +2607,7 @@ D3D11_CreateRenderer(SDL_Window * window, Uint32 flags)
     if ((flags & SDL_RENDERER_PRESENTVSYNC)) {
         renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
     }
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, D3D11_UpdateVSync, renderer);
 #endif
 
     /* HACK: make sure the SDL_Renderer references the SDL_Window data now, in

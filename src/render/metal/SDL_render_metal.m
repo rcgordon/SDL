@@ -26,6 +26,7 @@
 #include "SDL_syswm.h"
 #include "SDL_metal.h"
 #include "../SDL_sysrender.h"
+#include "../../SDL_hints_c.h"
 
 #include <Availability.h>
 #import <Metal/Metal.h>
@@ -1620,8 +1621,31 @@ METAL_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 }}
 
 static void
+METAL_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+#if (defined(__MACOSX__) && defined(MAC_OS_X_VERSION_10_13)) || TARGET_OS_MACCATALYST
+    if (@available(macOS 10.13, *)) {
+        SDL_Renderer *renderer = userdata;
+        METAL_RenderData *data = (__bridge METAL_RenderData *) renderer->driverdata;
+        if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+            data.mtllayer.displaySyncEnabled = YES;
+            renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+        } else {
+            data.mtllayer.displaySyncEnabled = NO;
+            renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+        }
+    }
+#endif
+}
+
+static void
 METAL_DestroyRenderer(SDL_Renderer * renderer)
 { @autoreleasepool {
+#if (defined(__MACOSX__) && defined(MAC_OS_X_VERSION_10_13)) || TARGET_OS_MACCATALYST
+    if (@available(macOS 10.13, *)) {
+        SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, METAL_UpdateVSync, renderer);
+    }
+#endif
     if (renderer->driverdata) {
         METAL_RenderData *data = CFBridgingRelease(renderer->driverdata);
 
@@ -1913,6 +1937,7 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
         if (data.mtllayer.displaySyncEnabled) {
             renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
         }
+        SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, METAL_UpdateVSync, renderer);
     } else
 #endif
     {

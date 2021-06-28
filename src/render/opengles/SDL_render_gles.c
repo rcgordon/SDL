@@ -25,6 +25,7 @@
 #include "SDL_hints.h"
 #include "SDL_opengles.h"
 #include "../SDL_sysrender.h"
+#include "../../SDL_hints_c.h"
 
 /* To prevent unnecessary window recreation,
  * these should match the defaults selected in SDL_GL_ResetAttributes
@@ -1087,11 +1088,29 @@ GLES_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 }
 
 static void
+GLES_UpdateVSync(void * userdata, const char * name, const char * oldValue, const char * newValue)
+{
+    SDL_Renderer *renderer = userdata;
+    if (SDL_GetStringBoolean(newValue, SDL_FALSE)) {
+        SDL_GL_SetSwapInterval(1);
+    } else {
+        SDL_GL_SetSwapInterval(0);
+    }
+    if (SDL_GL_GetSwapInterval() > 0) {
+        renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
+    } else {
+        renderer->info.flags &= ~SDL_RENDERER_PRESENTVSYNC;
+    }
+}
+
+static void
 GLES_DestroyRenderer(SDL_Renderer * renderer)
 {
     GLES_RenderData *data = (GLES_RenderData *) renderer->driverdata;
 
     if (data) {
+        SDL_DelHintCallback(SDL_HINT_RENDER_VSYNC, GLES_UpdateVSync, renderer);
+
         if (data->context) {
             while (data->framebuffers) {
                GLES_FBOList *nextnode = data->framebuffers->next;
@@ -1233,6 +1252,8 @@ GLES_CreateRenderer(SDL_Window * window, Uint32 flags)
     if (SDL_GL_GetSwapInterval() > 0) {
         renderer->info.flags |= SDL_RENDERER_PRESENTVSYNC;
     }
+
+    SDL_AddHintCallback(SDL_HINT_RENDER_VSYNC, GLES_UpdateVSync, renderer);
 
     value = 0;
     data->glGetIntegerv(GL_MAX_TEXTURE_SIZE, &value);
