@@ -30,6 +30,9 @@ macro(FindLibraryAndSONAME _LIB)
 endmacro()
 
 macro(CheckDLOPEN)
+  # NOTE: CheckDLOPEN is called only for relevant platforms.
+  set(DYNAPI_NEEDS_DLOPEN 1)
+
   check_symbol_exists(dlopen "dlfcn.h" HAVE_DLOPEN)
   if(NOT HAVE_DLOPEN)
     foreach(_LIBNAME dl tdl)
@@ -54,14 +57,6 @@ macro(CheckDLOPEN)
          const char *loaderror = (char *) dlerror();
        }" HAVE_DLOPEN)
     set(CMAKE_REQUIRED_LIBRARIES)
-  endif()
-
-  if (HAVE_DLOPEN)
-    set(SDL_LOADSO_DLOPEN 1)
-    set(HAVE_SDL_DLOPEN TRUE)
-    file(GLOB DLOPEN_SOURCES ${SDL2_SOURCE_DIR}/src/loadso/dlopen/*.c)
-    set(SOURCE_FILES ${SOURCE_FILES} ${DLOPEN_SOURCES})
-    set(HAVE_SDL_LOADSO TRUE)
   endif()
 endmacro()
 
