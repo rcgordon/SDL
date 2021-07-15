@@ -34,8 +34,6 @@
 !!! FIXME:  in Ubuntu 18.04 (and other distros).
 */
 
-#define MESA_EGL_NO_X11_HEADERS
-#define EGL_NO_X11
 #include <EGL/egl.h>
 #include "wayland-util.h"
 
@@ -71,6 +69,7 @@ typedef struct {
     struct zxdg_decoration_manager_v1 *decoration_manager;
     struct zwp_keyboard_shortcuts_inhibit_manager_v1 *key_inhibitor_manager;
     struct zwp_idle_inhibit_manager_v1 *idle_inhibit_manager;
+    struct xdg_activation_v1 *activation_manager;
 
     EGLDisplay edpy;
     EGLContext context;

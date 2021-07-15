@@ -1666,7 +1666,7 @@ Optional Features:
   --enable-video-directfb use DirectFB video driver [default=no]
   --enable-directfb-shared
                           dynamically load directfb support [default=yes]
-  --enable-video-kmsdrm   use KMSDRM video driver [default=no]
+  --enable-video-kmsdrm   use KMSDRM video driver [default=yes]
   --enable-kmsdrm-shared  dynamically load kmsdrm support [default=yes]
   --enable-video-dummy    use dummy video driver [default=yes]
   --enable-video-opengl   include OpenGL support [default=yes]
@@ -17826,14 +17826,27 @@ $as_echo "$have_gcc_sse3" >&6; }
         fi
     fi
 
-    ac_fn_c_check_header_mongrel "$LINENO" "immintrin.h" "ac_cv_header_immintrin_h" "$ac_includes_default"
-if test "x$ac_cv_header_immintrin_h" = xyes; then :
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for immintrin.h" >&5
+$as_echo_n "checking for immintrin.h... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <immintrin.h>
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
   have_immintrin_h_hdr=yes
 else
   have_immintrin_h_hdr=no
 fi
-
-
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $have_immintrin_h_hdr" >&5
+$as_echo "$have_immintrin_h_hdr" >&6; }
     if test x$have_immintrin_h_hdr = xyes; then
 
 $as_echo "#define HAVE_IMMINTRIN_H 1" >>confdefs.h
@@ -21694,7 +21707,8 @@ $as_echo "#define SDL_VIDEO_DRIVER_X11_XVIDMODE 1" >>confdefs.h
                 SUMMARY_video_x11="${SUMMARY_video_x11} xvidmode"
             fi
         fi
-    else
+    fi
+    if test x$have_x != xyes; then
         # Prevent Mesa from including X11 headers
         EXTRA_CFLAGS="$EXTRA_CFLAGS -DMESA_EGL_NO_X11_HEADERS -DEGL_NO_X11"
     fi
@@ -22051,7 +22065,7 @@ CheckKMSDRM()
 if test "${enable_video_kmsdrm+set}" = set; then :
   enableval=$enable_video_kmsdrm;
 else
-  enable_video_kmsdrm=no
+  enable_video_kmsdrm=yes
 fi
 
 
@@ -22316,16 +22330,15 @@ else
 fi
 
 
-CheckOpenGLX11()
+CheckGLX()
 {
     if test x$enable_video = xyes -a x$enable_video_opengl = xyes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenGL (GLX) support" >&5
-$as_echo_n "checking for OpenGL (GLX) support... " >&6; }
-        video_opengl=no
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GLX support" >&5
+$as_echo_n "checking for GLX support... " >&6; }
+        video_opengl_glx=no
         cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-         #include <GL/gl.h>
          #include <GL/glx.h>
 
 int
@@ -22337,59 +22350,18 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  video_opengl=yes
+  video_opengl_glx=yes
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $video_opengl" >&5
-$as_echo "$video_opengl" >&6; }
-        if test x$video_opengl = xyes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $video_opengl_glx" >&5
+$as_echo "$video_opengl_glx" >&6; }
+        if test x$video_opengl_glx = xyes; then
 
 $as_echo "#define SDL_VIDEO_OPENGL 1" >>confdefs.h
 
 
 $as_echo "#define SDL_VIDEO_OPENGL_GLX 1" >>confdefs.h
 
-
-$as_echo "#define SDL_VIDEO_RENDER_OGL 1" >>confdefs.h
-
-            SUMMARY_video="${SUMMARY_video} opengl(glx)"
-        fi
-    fi
-}
-
-CheckOpenGLKMSDRM()
-{
-    if test x$enable_video = xyes -a x$enable_video_opengl = xyes -a x$enable_video_kmsdrm = xyes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenGL (GLVND) support" >&5
-$as_echo_n "checking for OpenGL (GLVND) support... " >&6; }
-        video_opengl=no
-        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-         #include <GL/gl.h>
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  video_opengl=yes
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $video_opengl" >&5
-$as_echo "$video_opengl" >&6; }
-        if test x$video_opengl = xyes; then
-
-$as_echo "#define SDL_VIDEO_OPENGL 1" >>confdefs.h
-
-
-$as_echo "#define SDL_VIDEO_RENDER_OGL 1" >>confdefs.h
-
-            SUMMARY_video="${SUMMARY_video} opengl(glvnd)"
         fi
     fi
 }
@@ -22416,9 +22388,9 @@ else
 fi
 
 
-CheckOpenGLESX11()
+CheckEGL()
 {
-    if test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
+    if test x$enable_video = xyes -a x$enable_video_opengl = xyes || test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
         { $as_echo "$as_me:${as_lineno-$LINENO}: checking for EGL support" >&5
 $as_echo_n "checking for EGL support... " >&6; }
         video_opengl_egl=no
@@ -22451,7 +22423,50 @@ $as_echo "$video_opengl_egl" >&6; }
 $as_echo "#define SDL_VIDEO_OPENGL_EGL 1" >>confdefs.h
 
         fi
+    fi
+}
 
+CheckOpenGL()
+{
+    if test x$enable_video = xyes -a x$enable_video_opengl = xyes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenGL headers" >&5
+$as_echo_n "checking for OpenGL headers... " >&6; }
+        video_opengl=no
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+         #include <GL/gl.h>
+         #include <GL/glext.h>
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  video_opengl=yes
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $video_opengl" >&5
+$as_echo "$video_opengl" >&6; }
+        if test x$video_opengl = xyes; then
+
+$as_echo "#define SDL_VIDEO_OPENGL 1" >>confdefs.h
+
+
+$as_echo "#define SDL_VIDEO_RENDER_OGL 1" >>confdefs.h
+
+            SUMMARY_video="${SUMMARY_video} opengl"
+        fi
+    fi
+}
+
+CheckOpenGLES()
+{
+    if test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
         if test x$enable_video_opengles1 = xyes; then
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenGL ES v1 headers" >&5
 $as_echo_n "checking for OpenGL ES v1 headers... " >&6; }
@@ -22521,42 +22536,6 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL_ES2 1" >>confdefs.h
                 SUMMARY_video="${SUMMARY_video} opengl_es2"
             fi
         fi
-    fi
-}
-
-CheckEGLKMSDRM()
-{
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for EGL support" >&5
-$as_echo_n "checking for EGL support... " >&6; }
-    video_opengl_egl=no
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-      #define LINUX
-      #define EGL_API_FB
-      #define MESA_EGL_NO_X11_HEADERS
-      #define EGL_NO_X11
-      #include <EGL/egl.h>
-      #include <EGL/eglext.h>
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  video_opengl_egl=yes
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $video_opengl_egl" >&5
-$as_echo "$video_opengl_egl" >&6; }
-    if test x$video_opengl_egl = xyes; then
-
-$as_echo "#define SDL_VIDEO_OPENGL_EGL 1" >>confdefs.h
-
     fi
 }
 
@@ -24568,10 +24547,6 @@ fi
                 enable_hidapi_libusb=yes
                 require_hidapi_libusb=yes
                 ;;
-            # RAWINPUT is only available on Win32, but can be enabled if HIDAPI is
-            *-*-cygwin* | *-*-mingw*)
-                enable_joystick_rawinput=yes
-                ;;
         esac
 
         hidapi_support=yes
@@ -24667,11 +24642,6 @@ fi
 
 $as_echo "#define SDL_JOYSTICK_HIDAPI 1" >>confdefs.h
 
-            if test x$enable_joystick_rawinput = xyes; then
-
-$as_echo "#define SDL_JOYSTICK_RAWINPUT 1" >>confdefs.h
-
-            fi
             EXTRA_CFLAGS="$EXTRA_CFLAGS -I$srcdir/src/hidapi/hidapi"
             SOURCES="$SOURCES $srcdir/src/joystick/hidapi/*.c"
             SOURCES="$SOURCES $srcdir/src/hidapi/SDL_hidapi.c"
@@ -24957,12 +24927,12 @@ $as_echo "#define SDL_VIDEO_DRIVER_ANDROID 1" >>confdefs.h
         CheckRPI
         CheckX11
         CheckDirectFB
-        # Need to check for EGL first because KMSDRM depends on it.
-        CheckEGLKMSDRM
+        # Need to check for EGL first because KMSDRM and Wayland depends on it.
+        CheckEGL
         CheckKMSDRM
-        CheckOpenGLKMSDRM
-        CheckOpenGLX11
-        CheckOpenGLESX11
+        CheckGLX
+        CheckOpenGL
+        CheckOpenGLES
         CheckVulkan
         CheckWayland
         CheckInputEvents
@@ -25251,6 +25221,9 @@ $as_echo "#define SDL_AUDIO_DRIVER_WASAPI 1" >>confdefs.h
         fi
         # Set up files for the joystick library
         if test x$enable_joystick = xyes; then
+
+$as_echo "#define SDL_JOYSTICK_RAWINPUT 1" >>confdefs.h
+
             if test x$have_dinput = xyes -o x$have_xinput = xyes; then
                 if test x$have_xinput = xyes; then
 
@@ -25358,7 +25331,8 @@ $as_echo "#define SDL_LOADSO_WINDOWS 1" >>confdefs.h
         else
             LIBUUID=-luuid
         fi
-        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion $LIBUUID -static-libgcc"
+        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion $LIBUUID"
+        BUILD_LDFLAGS="$BUILD_LDFLAGS -Wc,-static-libgcc"
         # The Windows platform requires special setup
         VERSION_SOURCES="$srcdir/src/main/windows/*.rc"
         SDLMAIN_SOURCES="$srcdir/src/main/windows/*.c"
@@ -25617,7 +25591,8 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL_ES2 1" >>confdefs.h
         CheckX11
         CheckMacGL
         CheckMacGLES
-        CheckOpenGLX11
+        CheckGLX
+        CheckOpenGL
         CheckVulkan
         CheckPTHREAD
         CheckHIDAPI
@@ -26136,7 +26111,6 @@ if test x$WARN_ABOUT_ARM_SIMD_ASM_MIT = xyes; then
     SUMMARY="${SUMMARY}configure script with:\n"
     SUMMARY="${SUMMARY}\n    --disable-arm-simd\n"
 fi
-
 if test x$WARN_ABOUT_ARM_NEON_ASM_MIT = xyes; then
     SUMMARY="${SUMMARY}\nSDL is being built with ARM NEON optimizations, which\n"
     SUMMARY="${SUMMARY}uses code licensed under the MIT license. If this is a\n"

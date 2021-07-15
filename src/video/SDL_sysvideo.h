@@ -242,6 +242,7 @@ struct SDL_VideoDevice
     int (*UpdateWindowFramebuffer) (_THIS, SDL_Window * window, const SDL_Rect * rects, int numrects);
     void (*DestroyWindowFramebuffer) (_THIS, SDL_Window * window);
     void (*OnWindowEnter) (_THIS, SDL_Window * window);
+    int (*FlashWindow) (_THIS, SDL_Window * window, Uint32 flash_count);
 
     /* * * */
     /*
@@ -292,6 +293,8 @@ struct SDL_VideoDevice
     /*
      * Event manager functions
      */
+    int (*WaitEventTimeout) (_THIS, int timeout);
+    void (*SendWakeupEvent) (_THIS, SDL_Window *window);
     void (*PumpEvents) (_THIS);
 
     /* Suspend the screensaver */
@@ -326,6 +329,8 @@ struct SDL_VideoDevice
     /* Data common to all drivers */
     SDL_bool is_dummy;
     SDL_bool suspend_screensaver;
+    SDL_Window *wakeup_window;
+    SDL_mutex *wakeup_lock; /* Initialized only if WaitEventTimeout/SendWakeupEvent are supported */
     int num_displays;
     SDL_VideoDisplay *displays;
     SDL_Window *windows;

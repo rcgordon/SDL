@@ -729,9 +729,10 @@ if test x$enable_assembly = xyes; then
         fi
     fi
 
-    AC_CHECK_HEADER(immintrin.h,
-                    have_immintrin_h_hdr=yes,
-                    have_immintrin_h_hdr=no)
+    AC_MSG_CHECKING(for immintrin.h)
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <immintrin.h>]])],
+       [have_immintrin_h_hdr=yes],[have_immintrin_h_hdr=no])
+    AC_MSG_RESULT($have_immintrin_h_hdr)
     if test x$have_immintrin_h_hdr = xyes; then
         AC_DEFINE(HAVE_IMMINTRIN_H, 1, [ ])
     fi
@@ -2018,7 +2019,8 @@ XITouchClassInfo *t;
                 SUMMARY_video_x11="${SUMMARY_video_x11} xvidmode"
             fi
         fi
-    else
+    fi
+    if test x$have_x != xyes; then
         # Prevent Mesa from including X11 headers
         EXTRA_CFLAGS="$EXTRA_CFLAGS -DMESA_EGL_NO_X11_HEADERS -DEGL_NO_X11"
     fi
@@ -2193,8 +2195,8 @@ dnl Find KMSDRM
 CheckKMSDRM()
 {
     AC_ARG_ENABLE(video-kmsdrm,
-[AS_HELP_STRING([--enable-video-kmsdrm], [use KMSDRM video driver [default=no]])],
-                  , enable_video_kmsdrm=no)
+[AS_HELP_STRING([--enable-video-kmsdrm], [use KMSDRM video driver [default=yes]])],
+                  , enable_video_kmsdrm=yes)
 
     if  test x$enable_video = xyes && \
         test x$enable_video_kmsdrm = xyes && \
@@ -2286,40 +2288,19 @@ AC_ARG_ENABLE(video-opengl,
 [AS_HELP_STRING([--enable-video-opengl], [include OpenGL support [default=yes]])],
               , enable_video_opengl=yes)
 
-dnl Find OpenGL
-CheckOpenGLX11()
+dnl Find GLX
+CheckGLX()
 {
     if test x$enable_video = xyes -a x$enable_video_opengl = xyes; then
-        AC_MSG_CHECKING(for OpenGL (GLX) support)
-        video_opengl=no
+        AC_MSG_CHECKING(for GLX support)
+        video_opengl_glx=no
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-         #include <GL/gl.h>
          #include <GL/glx.h>
-        ]],[])], [video_opengl=yes],[])
-        AC_MSG_RESULT($video_opengl)
-        if test x$video_opengl = xyes; then
+        ]],[])], [video_opengl_glx=yes],[])
+        AC_MSG_RESULT($video_opengl_glx)
+        if test x$video_opengl_glx = xyes; then
             AC_DEFINE(SDL_VIDEO_OPENGL, 1, [ ])
             AC_DEFINE(SDL_VIDEO_OPENGL_GLX, 1, [ ])
-            AC_DEFINE(SDL_VIDEO_RENDER_OGL, 1, [ ])
-            SUMMARY_video="${SUMMARY_video} opengl(glx)"
-        fi
-    fi
-}
-
-dnl Find KMSDRM OpenGL (GLVND)
-CheckOpenGLKMSDRM()
-{
-    if test x$enable_video = xyes -a x$enable_video_opengl = xyes -a x$enable_video_kmsdrm = xyes; then
-        AC_MSG_CHECKING(for OpenGL (GLVND) support)
-        video_opengl=no
-        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-         #include <GL/gl.h>
-        ]],[])], [video_opengl=yes],[])
-        AC_MSG_RESULT($video_opengl)
-        if test x$video_opengl = xyes; then 
-            AC_DEFINE(SDL_VIDEO_OPENGL, 1, [ ])
-            AC_DEFINE(SDL_VIDEO_RENDER_OGL, 1, [ ])
-            SUMMARY_video="${SUMMARY_video} opengl(glvnd)"
         fi
     fi
 }
@@ -2335,10 +2316,10 @@ AC_ARG_ENABLE(video-opengles2,
 [AS_HELP_STRING([--enable-video-opengles2], [include OpenGL ES 2.0 support [default=yes]])],
               , enable_video_opengles2=yes)
 
-dnl Find OpenGL ES
-CheckOpenGLESX11()
+dnl Find EGL
+CheckEGL()
 {
-    if test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
+    if test x$enable_video = xyes -a x$enable_video_opengl = xyes || test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
         AC_MSG_CHECKING(for EGL support)
         video_opengl_egl=no
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
@@ -2353,7 +2334,32 @@ CheckOpenGLESX11()
         if test x$video_opengl_egl = xyes; then
             AC_DEFINE(SDL_VIDEO_OPENGL_EGL, 1, [ ])
         fi
+    fi
+}
 
+dnl Find OpenGL
+CheckOpenGL()
+{
+    if test x$enable_video = xyes -a x$enable_video_opengl = xyes; then
+        AC_MSG_CHECKING(for OpenGL headers)
+        video_opengl=no
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+         #include <GL/gl.h>
+         #include <GL/glext.h>
+        ]],[])], [video_opengl=yes],[])
+        AC_MSG_RESULT($video_opengl)
+        if test x$video_opengl = xyes; then 
+            AC_DEFINE(SDL_VIDEO_OPENGL, 1, [ ])
+            AC_DEFINE(SDL_VIDEO_RENDER_OGL, 1, [ ])
+            SUMMARY_video="${SUMMARY_video} opengl"
+        fi
+    fi
+}
+
+dnl Find OpenGL ES
+CheckOpenGLES()
+{
+    if test x$enable_video = xyes -a x$enable_video_opengles = xyes; then
         if test x$enable_video_opengles1 = xyes; then
             AC_MSG_CHECKING(for OpenGL ES v1 headers)
             video_opengles_v1=no
@@ -2383,25 +2389,6 @@ CheckOpenGLESX11()
                 SUMMARY_video="${SUMMARY_video} opengl_es2"
             fi
         fi
-    fi
-}
-
-dnl Find EGL
-CheckEGLKMSDRM()
-{
-    AC_MSG_CHECKING(for EGL support)
-    video_opengl_egl=no
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-      #define LINUX
-      #define EGL_API_FB
-      #define MESA_EGL_NO_X11_HEADERS
-      #define EGL_NO_X11
-      #include <EGL/egl.h>
-      #include <EGL/eglext.h>
-    ]],[])], [video_opengl_egl=yes],[])
-    AC_MSG_RESULT($video_opengl_egl)
-    if test x$video_opengl_egl = xyes; then
-        AC_DEFINE(SDL_VIDEO_OPENGL_EGL, 1, [ ])
     fi
 }
 
@@ -3362,10 +3349,6 @@ CheckHIDAPI()
                 enable_hidapi_libusb=yes
                 require_hidapi_libusb=yes
                 ;;
-            # RAWINPUT is only available on Win32, but can be enabled if HIDAPI is
-            *-*-cygwin* | *-*-mingw*)
-                enable_joystick_rawinput=yes
-                ;;
         esac
 
         hidapi_support=yes
@@ -3382,9 +3365,6 @@ CheckHIDAPI()
 
         if test x$hidapi_support = xyes; then
             AC_DEFINE(SDL_JOYSTICK_HIDAPI, 1, [ ])
-            if test x$enable_joystick_rawinput = xyes; then
-                AC_DEFINE(SDL_JOYSTICK_RAWINPUT, 1, [ ])
-            fi
             EXTRA_CFLAGS="$EXTRA_CFLAGS -I$srcdir/src/hidapi/hidapi"
             SOURCES="$SOURCES $srcdir/src/joystick/hidapi/*.c"
             SOURCES="$SOURCES $srcdir/src/hidapi/SDL_hidapi.c"
@@ -3562,12 +3542,12 @@ case "$host" in
         CheckRPI
         CheckX11
         CheckDirectFB
-        # Need to check for EGL first because KMSDRM depends on it.
-        CheckEGLKMSDRM
+        # Need to check for EGL first because KMSDRM and Wayland depends on it.
+        CheckEGL
         CheckKMSDRM
-        CheckOpenGLKMSDRM
-        CheckOpenGLX11
-        CheckOpenGLESX11
+        CheckGLX
+        CheckOpenGL
+        CheckOpenGLES
         CheckVulkan
         CheckWayland
         CheckInputEvents
@@ -3810,6 +3790,7 @@ case "$host" in
         fi
         # Set up files for the joystick library
         if test x$enable_joystick = xyes; then
+            AC_DEFINE(SDL_JOYSTICK_RAWINPUT, 1, [ ])
             if test x$have_dinput = xyes -o x$have_xinput = xyes; then
                 if test x$have_xinput = xyes; then
                     AC_DEFINE(SDL_JOYSTICK_XINPUT, 1, [ ])
@@ -3884,7 +3865,8 @@ case "$host" in
         else
             LIBUUID=-luuid
         fi
-        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion $LIBUUID -static-libgcc"
+        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion $LIBUUID"
+        BUILD_LDFLAGS="$BUILD_LDFLAGS -Wc,-static-libgcc"
         # The Windows platform requires special setup
         VERSION_SOURCES="$srcdir/src/main/windows/*.rc"
         SDLMAIN_SOURCES="$srcdir/src/main/windows/*.c"
@@ -4079,7 +4061,8 @@ case "$host" in
         CheckX11
         CheckMacGL
         CheckMacGLES
-        CheckOpenGLX11
+        CheckGLX
+        CheckOpenGL
         CheckVulkan
         CheckPTHREAD
         CheckHIDAPI
@@ -4532,7 +4515,6 @@ if test x$WARN_ABOUT_ARM_SIMD_ASM_MIT = xyes; then
     SUMMARY="${SUMMARY}configure script with:\n"
     SUMMARY="${SUMMARY}\n    --disable-arm-simd\n"
 fi
-
 if test x$WARN_ABOUT_ARM_NEON_ASM_MIT = xyes; then
     SUMMARY="${SUMMARY}\nSDL is being built with ARM NEON optimizations, which\n"
     SUMMARY="${SUMMARY}uses code licensed under the MIT license. If this is a\n"

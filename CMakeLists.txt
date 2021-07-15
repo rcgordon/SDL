@@ -1,4 +1,4 @@
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
   message(FATAL_ERROR "Prevented in-tree built. Please create a build directory outside of the SDL source code and call cmake from there")
 endif()
 
@@ -419,6 +419,10 @@ set(SDL_STATIC ${SDL_STATIC_ENABLED_BY_DEFAULT} CACHE BOOL "Build a static versi
 
 dep_option(SDL_STATIC_PIC      "Static version of the library should be built with Position Independent Code" OFF "SDL_STATIC" OFF)
 set_option(SDL_TEST            "Build the test directory" OFF)
+
+if(VITA)
+    set_option(VIDEO_VITA_PIB  "Build with PSVita piglet gles2 support" OFF)
+endif()
 
 # General source files
 file(GLOB SOURCE_FILES
@@ -1202,22 +1206,20 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID AND NOT RISCOS)
     CheckRPI()
     CheckX11()
     CheckDirectFB()
-    CheckOpenGLX11()
-    CheckOpenGLESX11()
+    # Need to check for EGL first because KMSDRM and Wayland depends on it.
+    CheckEGL()
+    CheckKMSDRM()
+    CheckGLX()
+    CheckOpenGL()
+    CheckOpenGLES()
     CheckWayland()
     CheckVivante()
-    # Need to check EGL before checking KMSDRM because KMSDRM depends on it.
-    CheckEGLKMSDRM()
-    CheckKMSDRM()
-    CheckOpenGLKMSDRM()
   endif()
 
   if(UNIX)
     file(GLOB CORE_UNIX_SOURCES ${SDL2_SOURCE_DIR}/src/core/unix/*.c)
     set(SOURCE_FILES ${SOURCE_FILES} ${CORE_UNIX_SOURCES})
-  endif()
 
-  if(LINUX)
     check_c_source_compiles("
         #include <linux/input.h>
         #ifndef EVIOCGNAME
@@ -1225,16 +1227,28 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID AND NOT RISCOS)
         #endif
         int main(int argc, char** argv) {}" HAVE_INPUT_EVENTS)
 
-    check_c_source_compiles("
-        #include <linux/kd.h>
-        #include <linux/keyboard.h>
+    if(LINUX)
+      check_c_source_compiles("
+          #include <linux/kd.h>
+          #include <linux/keyboard.h>
 
-        int main(int argc, char **argv)
-        {
-            struct kbentry kbe;
-            kbe.kb_table = KG_CTRL;
-            ioctl(0, KDGKBENT, &kbe);
-        }" HAVE_INPUT_KD)
+          int main(int argc, char **argv)
+          {
+              struct kbentry kbe;
+              kbe.kb_table = KG_CTRL;
+              ioctl(0, KDGKBENT, &kbe);
+          }" HAVE_INPUT_KD)
+    elseif(FREEBSD)
+      check_c_source_compiles("
+          #include <sys/kbio.h>
+          #include <sys/ioctl.h>
+
+          int main(int argc, char **argv)
+          {
+              accentmap_t accTable;
+              ioctl(0, KDENABIO, 1);
+          }" HAVE_INPUT_KBIO)
+    endif()
 
     if(HAVE_INPUT_EVENTS)
       set(SDL_INPUT_LINUXEV 1)
@@ -1250,11 +1264,16 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID AND NOT RISCOS)
     if(HAVE_INPUT_KD)
       set(SDL_INPUT_LINUXKD 1)
     endif()
+      
+    if(HAVE_INPUT_KBIO)
+      set(SDL_INPUT_FBSDKBIO 1)
+    endif()
 
     check_include_file("libudev.h" HAVE_LIBUDEV_H)
     check_include_file("sys/inotify.h" HAVE_SYS_INOTIFY_H)
     check_symbol_exists(inotify_init "sys/inotify.h" HAVE_INOTIFY_INIT)
     check_symbol_exists(inotify_init1 "sys/inotify.h" HAVE_INOTIFY_INIT1)
+      
     if(HAVE_SYS_INOTIFY_H AND HAVE_INOTIFY_INIT)
       set(HAVE_INOTIFY 1)
     endif()
@@ -1280,6 +1299,16 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID AND NOT RISCOS)
         set(SDL_USE_IME TRUE)
         add_definitions(-DSDL_USE_IME)   # !!! FIXME: why isn't this a definition and not in SDL_config.h.cmake?
       endif()
+        
+      if(FREEBSD AND NOT HAVE_INOTIFY)
+        pkg_search_module(INOTIFY libinotify)
+        if(INOTIFY_FOUND)
+          set(HAVE_INOTIFY 1)
+          include_directories(${INOTIFY_INCLUDE_DIRS})
+          list(APPEND EXTRA_LIBS ${INOTIFY_LIBRARIES})
+        endif()
+      endif()
+
       if(HAVE_LIBUNWIND_H)
         # We've already found the header, so REQUIRE the lib to be present
         pkg_search_module(UNWIND REQUIRED libunwind)
@@ -1311,6 +1340,10 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID AND NOT RISCOS)
     if(HAVE_INPUT_EVENTS)
       set(SOURCE_FILES ${SOURCE_FILES} "${SDL2_SOURCE_DIR}/src/core/linux/SDL_evdev.c")
       set(SOURCE_FILES ${SOURCE_FILES} "${SDL2_SOURCE_DIR}/src/core/linux/SDL_evdev_kbd.c")
+    endif()
+      
+    if(HAVE_INPUT_KBIO)
+      set(SOURCE_FILES ${SOURCE_FILES} "${SDL2_SOURCE_DIR}/src/core/freebsd/SDL_evdev_kbd_freebsd.c")
     endif()
 
     # Always compiled for Linux, unconditionally:
@@ -1651,6 +1684,9 @@ elseif(WINDOWS)
     if(HAVE_HIDAPI)
       set(SOURCE_FILES ${SOURCE_FILES} ${SDL2_SOURCE_DIR}/src/hidapi/windows/hid.c)
     endif()
+    if(NOT WINDOWS_STORE)
+      set(SDL_JOYSTICK_RAWINPUT 1)
+    endif()
     file(GLOB JOYSTICK_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/windows/*.c)
     set(SOURCE_FILES ${SOURCE_FILES} ${JOYSTICK_SOURCES})
     if(HAVE_DINPUT_H)
@@ -1870,7 +1906,7 @@ elseif(APPLE)
         #import <Metal/Metal.h>
         #import <QuartzCore/CAMetalLayer.h>
 
-        #if TARGET_OS_SIMULATOR || (!TARGET_CPU_X86_64 && !TARGET_CPU_ARM64)
+        #if (!TARGET_CPU_X86_64 && !TARGET_CPU_ARM64)
         #error Metal doesn't work on this configuration
         #endif
         int main()
@@ -2113,16 +2149,22 @@ elseif(VITA)
     set(SOURCE_FILES ${SOURCE_FILES} ${VITA_VIDEO_SOURCES})
     set(HAVE_SDL_VIDEO TRUE)
 
-    check_include_file(pib.h HAVE_PIGS_IN_BLANKET_H)
 
+    if(VIDEO_VITA_PIB)
+      check_include_file(pib.h HAVE_PIGS_IN_BLANKET_H)
 
-    if(HAVE_PIGS_IN_BLANKET_H)
-      set(SDL_VIDEO_OPENGL_ES2 1)
-      list(APPEND EXTRA_LIBS
-        pib
-      )
-
+      if(HAVE_PIGS_IN_BLANKET_H)
+        set(SDL_VIDEO_OPENGL_ES2 1)
+        list(APPEND EXTRA_LIBS
+          pib
+        )
+        set(HAVE_VIDEO_VITA_PIB ON)
+        set(SDL_VIDEO_VITA_PIB 1)
+      else()
+        set(HAVE_VIDEO_VITA_PIB OFF)
+      endif()
     endif()
+
     set(SDL_VIDEO_RENDER_VITA_GXM 1)
 
     list(APPEND EXTRA_LIBS
@@ -2139,8 +2181,18 @@ elseif(VITA)
       SceTouch_stub
       SceHid_stub
       SceMotion_stub
+      ScePower_stub
       m
     )
+    if(HAVE_VIDEO_VITA_PIB)
+        list(PREPEND EXTRA_LIBS
+          pib
+          libScePiglet_stub
+          SceShaccCg_stub
+          taihen_stub
+        )
+    endif()
+
   endif()
 
   set(HAVE_ARMSIMD TRUE)
@@ -2262,7 +2314,7 @@ if(NOT CMAKE_HOST_WIN32)
   execute_process(COMMAND sh ${SDL2_SOURCE_DIR}/build-scripts/updaterev.sh
     WORKING_DIRECTORY ${SDL2_BINARY_DIR})
 endif()
-if(NOT WINDOWS OR CYGWIN)
+if(NOT WINDOWS OR CYGWIN OR MINGW)
 
   set(prefix ${CMAKE_INSTALL_PREFIX})
 
@@ -2481,7 +2533,7 @@ if(SDL_SHARED)
   elseif(UNIX AND NOT ANDROID)
     set_target_properties(SDL2 PROPERTIES
       VERSION ${LT_VERSION}
-      SOVERSION ${LT_REVISION}
+      SOVERSION ${LT_MAJOR}
       OUTPUT_NAME "SDL2-${LT_RELEASE}")
   else()
     if(WINDOWS OR CYGWIN)
@@ -2623,7 +2675,7 @@ else()
   set(SOPOSTFIX "")
 endif()
 
-if(NOT (WINDOWS OR CYGWIN))
+if(NOT (WINDOWS OR CYGWIN OR MINGW))
   if(SDL_SHARED)
     set(SOEXT ${CMAKE_SHARED_LIBRARY_SUFFIX}) # ".so", ".dylib", etc.
     get_target_property(SONAME SDL2 OUTPUT_NAME)
