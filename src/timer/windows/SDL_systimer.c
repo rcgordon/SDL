@@ -31,7 +31,11 @@
 
 /* The first (low-resolution) ticks value of the application */
 static DWORD start = 0;
-static BOOL ticks_started = FALSE; 
+static BOOL ticks_started = FALSE;
+
+#ifndef __WINRT__
+    static UINT timer_period = 0;
+#endif
 
 /* Store if a high-resolution performance counter exists on the system */
 static BOOL hires_timer_available;
@@ -44,8 +48,6 @@ static void
 SDL_SetSystemTimerResolution(const UINT uPeriod)
 {
 #ifndef __WINRT__
-    static UINT timer_period = 0;
-
     if (uPeriod != timer_period) {
         if (timer_period) {
             timeEndPeriod(timer_period);
@@ -163,6 +165,17 @@ SDL_GetPerformanceFrequency(void)
         return 1000;
     }
     return frequency.QuadPart;
+}
+
+Uint32
+SDL_GetSchedulerPrecision(void)
+{
+#ifndef __WINRT__
+	return timer_period * 1000;
+#else
+	SDL_Unsupported();
+	return 0;
+#endif
 }
 
 void
